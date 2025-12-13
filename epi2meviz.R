@@ -5,9 +5,7 @@ library(stringr)
 library(plotly)
 library(shinydashboard)
 library(shinyBS)
-library(DT)
 library(htmlwidgets)
-library(leaflet)
 library(tidyr)
 library(shinyjs)
 library(microbiome)
@@ -135,9 +133,6 @@ ui <- dashboardPage(skin = "red",
 server <- function(input, output, session) {
   # Set large upload size limit (server side)
   options(shiny.maxRequestSize = 500 * 1024^2)
-
-  # Load help modules
-  source("modules/help.R", local = TRUE)
 
   dat <- reactiveVal(NULL)
 
