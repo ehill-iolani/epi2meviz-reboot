@@ -11,5 +11,3 @@ This app will take the .csv file downloaded from the EPI2ME analysis and will co
 4) Conduct a Bray Curtis dissimilarity principle coordinate analysis (PCoA) and plot PCoA 1 vs PCoA 2 (only works if there are > 2 barcodes in the analysis)
 
 You will need to upload the .csv containing classifications file downloaded from either wf-16s or wf-metagenomics analysis, and optionally, a medata files that corresponds with the barcodes in the analysis.
-
-
