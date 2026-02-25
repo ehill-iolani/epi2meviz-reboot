@@ -63,7 +63,6 @@ ui <- dashboardPage(skin = "red",
         box(
           title = "EPI2ME Taxa Table Upload", status = "primary", solidHeader = TRUE, width = 12,
           fileInput("data", "Input csv files", accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv"), multiple = FALSE),
-          actionButton("datasubmit", "Submit"),
           actionButton("datahelp", "Help!")
         )
       ),
@@ -72,6 +71,13 @@ ui <- dashboardPage(skin = "red",
           title = "Metadata Upload (Optional)", status = "primary", solidHeader = TRUE, width = 12,
           fileInput("meta", "Input csv files", accept = c("text/csv", "text/comma-separated-values,text/plain", ".csv"), multiple = FALSE),
           actionButton("metadatahelp", "Help!")
+        )
+      ),
+      fluidRow(
+        box(
+          title = "Submit Data", status = "primary", solidHeader = TRUE, width = 12,
+          actionButton("datasubmit", "Submit"),
+          actionButton("submithelp", "Help!")
         )
       )
     ),
@@ -345,6 +351,24 @@ server <- function(input, output, session) {
     shinyalert(
       title = "Metadata Upload Help",
       text = paste0("Uploading metadata is optional but recommended for enhanced analysis. Your metadata CSV file should contain a 'barcode' column that matches the sample names in your OTU table. Additional columns can include any relevant sample information you wish to use for grouping or coloring in visualizations."),
+      type = "info",
+      closeOnEsc = TRUE,
+      closeOnClickOutside = TRUE,
+      html = FALSE,
+      showConfirmButton = TRUE,
+      showCancelButton = FALSE,
+      confirmButtonText = "OK",
+      confirmButtonCol = "#AEDEF4",
+      timer = 0,
+      imageUrl = "",
+      animation = TRUE
+    )
+  })
+
+  observeEvent(input$submithelp, {
+    shinyalert(
+      title = "Submit Data Help",
+      text = paste0("After uploading your data and optional metadata, click the 'Submit' button to process the data. This will create a phyloseq object that will be used for all subsequent analyses and visualizations. Once submitted, you can navigate to the other tabs to explore the rarefaction curve, relative abundance, alpha diversity, and PCoA plots."),
       type = "info",
       closeOnEsc = TRUE,
       closeOnClickOutside = TRUE,
