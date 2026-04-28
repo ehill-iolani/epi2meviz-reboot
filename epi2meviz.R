@@ -89,7 +89,8 @@ ui <- dashboardPage(skin = "red",
           plotlyOutput("rarecurveplot",
             height = "100%"
           ),
-          actionButton("rarehelp", "Help!")
+          actionButton("rarehelp", "Help!"),
+          downloadButton("downloadrare", "Download Plot")
         )
       )
     ),
@@ -102,7 +103,8 @@ ui <- dashboardPage(skin = "red",
           plotlyOutput("relabundplot",
             height = "100%"
           ),
-          actionButton("relabundhelp", "Help!")
+          actionButton("relabundhelp", "Help!"),
+          downloadButton("downloadrelabund", "Download Plot")
         )
       )
     ),
@@ -115,7 +117,8 @@ ui <- dashboardPage(skin = "red",
           plotlyOutput("alphadivplot",
             height = "100%"
           ),
-          actionButton("alphadivhelp", "Help!")
+          actionButton("alphadivhelp", "Help!"),
+          downloadButton("downloadalphadiv", "Download Plot")
         )
       )
     ),
@@ -129,7 +132,9 @@ ui <- dashboardPage(skin = "red",
           plotlyOutput("pcoaplot",
             height = "100%"
           ),
-          actionButton("pcoahelp", "Help!")
+          actionButton("pcoahelp", "Help!"),
+          downloadButton("downloadpcoa", "Download Plot"),
+          actionButton("permanovabutton", "Run PERMANOVA Test")
         )
       )
     )
@@ -278,6 +283,31 @@ server <- function(input, output, session) {
     )
   })
 
+  # Prepare rarefaction data for download
+  output$downloadrare <- downloadHandler(
+    filename = function() {
+      paste("rarefaction_plot", Sys.Date(), ".html", sep = "")
+    },
+    content = function(file) {
+      req(dat())
+      raref <- dat()
+      raref <- prune_taxa(taxa_sums(raref) > 1, raref)
+      otu_rare <- raref@otu_table
+      otu_rare <- as.data.frame(otu_rare)
+      sample_names <- rownames(otu_rare)
+
+      rareplot <- rarecurve(t(otu_rare), step = 50, sample = 5000, tidy = TRUE)
+
+      p <- ggplot(rareplot, aes(x = Sample, y = Species, color = Site)) +
+        geom_line() +
+        theme_classic() +
+        labs(x = "Sequencing Depth", y = "Observed Species")
+
+      p <- ggplotly(p)
+      htmlwidgets::saveWidget(p, file)
+    }
+  )
+
   # Relative abundance plot generation
   output$relabundplot <- renderPlotly({
     req(dat())
@@ -294,6 +324,27 @@ server <- function(input, output, session) {
         theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 1))
     )
   })
+
+  # Prepare relative abundance data for download
+  output$downloadrelabund <- downloadHandler(
+    filename = function() {
+      paste("relative_abundance_plot", Sys.Date(), ".html", sep = "")
+    },
+    content = function(file) {
+      req(dat())
+      relab <- dat()
+      relab <- tax_glom(relab, taxrank = input$taxlevel1)
+      relab <- transform_sample_counts(relab, function(x) x / sum(x) * 100)
+      p <- plot_bar(relab, fill = input$taxlevel1, title = "Relative Abundance Plot") +
+        geom_bar(stat = "identity", position = "stack", color = NA) +
+        theme_classic() +
+        ylab("Relative Abundance") +
+        xlab("Samples") +
+        theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 1))
+      p <- ggplotly(p)
+      htmlwidgets::saveWidget(p, file)
+    }
+  )
 
   # Alpha diversity plot generation
   output$alphadivplot <- renderPlotly({
@@ -312,6 +363,25 @@ server <- function(input, output, session) {
     )
   })
 
+  # Prepare alpha diversity data for download
+  output$downloadalphadiv <- downloadHandler(
+    filename = function() {
+      paste("alpha_diversity_plot", Sys.Date(), ".html", sep = "")
+    },
+    content = function(file) {
+      req(dat())
+      alpha_div <- dat()
+      p <- plot_richness(alpha_div, x = input$grouping, measures = c("Simpson"), color = input$grouping) +
+        geom_boxplot() +
+        theme_classic() +
+        xlab("Samples") +
+        ylab("Diversity Index") +
+        theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 1), legend.position = "none")
+      p <- ggplotly(p)
+      htmlwidgets::saveWidget(p, file)
+    }
+  )
+
   # PCoA
   output$pcoaplot <- renderPlotly({
     req(dat())
@@ -324,6 +394,68 @@ server <- function(input, output, session) {
     plot_ordination(pcoa_dat, ord, color = input$colorby) +
       geom_point(size = 5) +
       theme_classic()
+  })
+
+  # Prepare PCoA data for download
+  output$downloadpcoa <- downloadHandler(
+    filename = function() {
+      paste("pcoa_plot", Sys.Date(), ".html", sep = "")
+    },
+    content = function(file) {
+      req(dat())
+      pcoa_dat <- dat()
+      pcoa_dat <- tax_glom(pcoa_dat, taxrank = input$taxlevel2)
+      ord <- ordinate(pcoa_dat, "MDS", "bray")
+      p <- plot_ordination(pcoa_dat, ord, color = input$colorby) +
+        geom_point(size = 5) +
+        theme_classic()
+      p <- ggplotly(p)
+      htmlwidgets::saveWidget(p, file)
+    }
+  )
+
+  # PERMANOVA test for PCoA tab
+  observeEvent(input$permanovabutton, {
+    req(dat())
+    pcoa_dat <- dat()
+    pcoa_dat <- tax_glom(pcoa_dat, taxrank = input$taxlevel2)
+    ord <- ordinate(pcoa_dat, "MDS", "bray")
+    md <- as.data.frame(ord)
+    if (input$colorby %in% colnames(md)) {
+      adonis_result <- adonis2(dist_matrix ~ md[[input$colorby]], permutations = 999)
+      p_value <- adonis_result$`Pr(>F)`[1]
+      shinyalert(
+        title = "PERMANOVA Result",
+        text = paste0("The PERMANOVA test for the selected grouping variable (", input$colorby, ") yielded a p-value of: ", round(p_value, 4), ". This indicates whether there are significant differences in microbial community composition between groups. A p-value less than 0.05 is typically considered statistically significant."),
+        type = "info",
+        closeOnEsc = TRUE,
+        closeOnClickOutside = TRUE,
+        html = FALSE,
+        showConfirmButton = TRUE,
+        showCancelButton = FALSE,
+        confirmButtonText = "OK",
+        confirmButtonCol = "#AEDEF4",
+        timer = 0,
+        imageUrl = "",
+        animation = TRUE
+      )
+    } else {
+      shinyalert(
+        title = "PERMANOVA Result",
+        text = paste0("The selected variable for coloring (", input$colorby, ") is not present in the metadata. Please select a valid variable to perform the PERMANOVA test."),
+        type = "error",
+        closeOnEsc = TRUE,
+        closeOnClickOutside = TRUE,
+        html = FALSE,
+        showConfirmButton = TRUE,
+        showCancelButton = FALSE,
+        confirmButtonText = "OK",
+        confirmButtonCol = "#AEDEF4",
+        timer = 0,
+        imageUrl = "",
+        animation = TRUE
+      )
+    }
   })
 
   #####################
